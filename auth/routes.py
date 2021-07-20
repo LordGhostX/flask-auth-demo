@@ -1,10 +1,12 @@
 from flask import request, jsonify
 from flask_httpauth import HTTPBasicAuth
+from itsdangerous import JSONWebSignatureSerializer
 from auth import app, db
 from auth.models import User
 from auth.utils import hash_password, verify_bcrypt
 
 basic_auth = HTTPBasicAuth()
+token_serializer = JSONWebSignatureSerializer(app.config["SERIALIZER_TOKEN"])
 
 
 @basic_auth.verify_password
@@ -54,4 +56,16 @@ def register():
 @basic_auth.login_required
 def login():
     user = basic_auth.current_user()
-    return user.username
+    user_data = {
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name
+    }
+    token = token_serializer.dumps(user_data).decode("utf-8")
+
+    return jsonify({
+        "msg": "successfully authenticated user",
+        "data": {
+            "auth_token": token
+        }
+    }), 200
