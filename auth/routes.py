@@ -1,7 +1,18 @@
 from flask import request, jsonify
+from flask_httpauth import HTTPBasicAuth
 from auth import app, db
 from auth.models import User
-from auth.utils import hash_password
+from auth.utils import hash_password, verify_bcrypt
+
+basic_auth = HTTPBasicAuth()
+
+
+@basic_auth.verify_password
+def verify_basic_auth(username, password):
+    username = username.lower()
+    user = User.query.get(username)
+    if user and verify_bcrypt(password, user.password):
+        return user
 
 
 @app.route("/")
@@ -10,7 +21,7 @@ def home_route():
 
 
 @app.route("/auth/register/", methods=["POST"])
-def register_user():
+def register():
     username = request.form.get("username", "")
     first_name = request.form.get("first_name")
     last_name = request.form.get("last_name")
@@ -37,3 +48,10 @@ def register_user():
         "msg": "successfully created user profile",
         "data": None
     }), 201
+
+
+@app.route("/auth/login/", methods=["POST"])
+@basic_auth.login_required
+def login():
+    user = basic_auth.current_user()
+    return user.username
