@@ -1,11 +1,12 @@
 from flask import request, jsonify
-from flask_httpauth import HTTPBasicAuth
+from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 from itsdangerous import JSONWebSignatureSerializer
 from auth import app, db
 from auth.models import User
 from auth.utils import hash_password, verify_bcrypt
 
 basic_auth = HTTPBasicAuth()
+bearer_auth = HTTPTokenAuth(scheme="Bearer")
 token_serializer = JSONWebSignatureSerializer(app.config["SERIALIZER_TOKEN"])
 
 
@@ -17,12 +18,23 @@ def verify_basic_auth(username, password):
         return user
 
 
-@app.route("/")
+@bearer_auth.verify_token
+def verify_bearer_auth(token):
+    try:
+        token_user = token_serializer.loads(token)
+    except:
+        return False
+    user = User.query.get(token_user["username"])
+    if user is not None:
+        return user
+
+
+@app.route("/", methods=["GET", "POST"])
 def home_route():
     return "Hello World"
 
 
-@app.route("/auth/register/", methods=["POST"])
+@app.route("/register/", methods=["POST"])
 def register():
     username = request.form.get("username", "")
     first_name = request.form.get("first_name")
@@ -52,20 +64,29 @@ def register():
     }), 201
 
 
-@app.route("/auth/login/", methods=["POST"])
+@app.route("/login/", methods=["POST"])
 @basic_auth.login_required
 def login():
     user = basic_auth.current_user()
-    user_data = {
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name
-    }
-    token = token_serializer.dumps(user_data).decode("utf-8")
+    token = token_serializer.dumps({"username": user.username}).decode("utf-8")
 
     return jsonify({
         "msg": "successfully authenticated user",
         "data": {
             "auth_token": token
+        }
+    }), 200
+
+
+@app.route("/dashboard/", methods=["GET"])
+@bearer_auth.login_required
+def dashboard():
+    user = bearer_auth.current_user()
+    return jsonify({
+        "msg": "successfully requested user info",
+        "data": {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name
         }
     }), 200
