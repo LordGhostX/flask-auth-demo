@@ -1,3 +1,4 @@
+import time
 from flask import request, jsonify
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 from itsdangerous import JSONWebSignatureSerializer
@@ -21,10 +22,12 @@ def verify_basic_auth(username, password):
 @bearer_auth.verify_token
 def verify_bearer_auth(token):
     try:
-        token_user = token_serializer.loads(token)
+        token_info = token_serializer.loads(token)
+        if time.time() >= token_info["expiration"]:
+            return False
     except:
         return False
-    user = User.query.get(token_user["username"])
+    user = User.query.get(token_info["username"])
     if user is not None:
         return user
 
@@ -68,7 +71,11 @@ def register():
 @basic_auth.login_required
 def login():
     user = basic_auth.current_user()
-    token = token_serializer.dumps({"username": user.username}).decode("utf-8")
+    token_info = {
+        "username": user.username,
+        "expiration": int(time.time()) + app.config["TOKEN_EXPIRATION"]
+    }
+    token = token_serializer.dumps(token_info).decode("utf-8")
 
     return jsonify({
         "msg": "successfully authenticated user",
