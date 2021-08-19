@@ -3,7 +3,7 @@ from flask import request, jsonify
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 from itsdangerous import JSONWebSignatureSerializer
 from auth import app, db
-from auth.models import User
+from auth.models import User, Blacklist
 from auth.utils import hash_password, verify_bcrypt
 
 basic_auth = HTTPBasicAuth()
@@ -27,6 +27,10 @@ def verify_bearer_auth(token):
             return False
     except:
         return False
+
+    if Blacklist.query.get(token) is not None:
+        return False
+
     user = User.query.get(token_info["username"])
     if user is not None:
         return user
@@ -96,4 +100,17 @@ def dashboard():
             "first_name": user.first_name,
             "last_name": user.last_name
         }
+    }), 200
+
+
+@app.route("/logout/", methods=["GET"])
+@bearer_auth.login_required
+def logout():
+    token = request.headers["Authorization"].split()[1]
+    db.session.add(Blacklist(token=token))
+    db.session.add()
+
+    return jsonify({
+        "msg": "successfully invalidated token",
+        "data": None
     }), 200

@@ -10,3 +10,8 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     date_created = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Blacklist(db.Model):
+    __tablename__ = "blacklist"
+    token = db.Column(db.String, primary_key=True)
